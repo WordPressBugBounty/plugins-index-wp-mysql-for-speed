@@ -1,5 +1,7 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 require_once( 'rendermonitor.php' );
 
 class ImfsPage extends Imfs_AdminPageFramework {
@@ -226,7 +228,7 @@ class ImfsPage extends Imfs_AdminPageFramework {
     $reviewUrl    = "https://wordpress.org/support/plugin/index-wp-mysql-for-speed/reviews/";
     $detailsUrl   = index_wp_mysql_for_speed_help_site . "tables_and_keys/";
     $clickHere    = __( 'click here', 'index-wp-mysql-for-speed' );
-    $orUseHelpTab = __( 'or use the Help tab in the upper left corner of this page.' );
+    $orUseHelpTab = __( 'or use the Help tab in the upper left corner of this page.' ,'index-wp-mysql-for-speed' );
     $help         = sprintf( $hyperlink, $helpUrl, $clickHere ) . ' ' . $orUseHelpTab;
     $support      = sprintf( $hyperlink, $supportUrl, $clickHere );
     $review       = sprintf( $hyperlink, $reviewUrl, $clickHere );
@@ -369,9 +371,27 @@ class ImfsPage extends Imfs_AdminPageFramework {
             ],
           ] );
       }
+      $this->checkPoolSize();
     }
-
     return $this->db->canReindex;
+  }
+
+  private function checkPoolSize() {
+    $diagnostics = $this->db->getPoolDiagnostics();
+    if ( false !== $diagnostics ) {
+
+      $this->addSettingFields(
+        [
+          'field_id'    => 'pool_size_notice',
+          'title'       => 'Notice',
+          'default'     => array_shift( $diagnostics ),
+          'description' => implode( ' ', $diagnostics ),
+          'save'        => false,
+          'class'       => [
+            'fieldrow' => 'warning',
+          ],
+        ] );
+    }
   }
 
   /**  check whether upgrading
@@ -641,7 +661,7 @@ class ImfsPage extends Imfs_AdminPageFramework {
         'field_id' => $action . '_wp',
         'label'    => $this->cliMessage(
           $actionToDisplay . ' ' . implode( ' ', $tableList ),
-          __( $title, 'index-wp-mysql-for-speed' ) ),
+          $title ),
         'save'     => false,
         'class'    => [
           'fieldrow' => 'info',
@@ -931,6 +951,7 @@ class ImfsPage extends Imfs_AdminPageFramework {
         ] );
     }
 
+    $this->checkPoolSize();
     $this->showIndexStatus( $this->db->getRekeying() );
     $this->showHealthInfo( $this->db->getHealthReport() );
     $this->uploadMetadata();
@@ -1026,6 +1047,7 @@ class ImfsPage extends Imfs_AdminPageFramework {
   private function populate_monitor_fields( $monitor ) {
 
     $uploadId = Imfs_AdminPageFramework::getOption( get_class( $this ), 'uploadId', ImfsQueries::getRandomString( 8 ) );
+    $uploadId = $this->sanitize_upload_id( $uploadId );
     $this->addSettingFields(
       [
         'field_id' => 'monitor_actions',
@@ -1078,16 +1100,16 @@ class ImfsPage extends Imfs_AdminPageFramework {
       $button = $submitInfo ['field_id'];
       if ( $button === 'upload_' . $monitor . '_now' ) {
         /* It's the upload button. Check the uploadId */
-        if ( ! isset( $inputs['monitor_actions']['uploadId'] ) || strlen( $inputs['monitor_actions']['uploadId'] ) === 0 ) {
+        if ( ! isset( $inputs['monitor_actions']['uploadId'] ) || ! $this->upload_id_is_sanitized( $inputs['monitor_actions']['uploadId'] ) ) {
           /* reject the bogus uploadId */
-          $errors['monitor_actions']['uploadId'] = __( "Please provide an upload id.", 'index-wp-mysql-for-speed' );
+          $errors['monitor_actions']['uploadId'] = __( "Please provide a valid upload id. Letters and numbers only.", 'index-wp-mysql-for-speed' );
           $this->setFieldErrors( $errors );
           $this->setSettingNotice( __( 'Make corrections and try again.', 'index-wp-mysql-for-speed' ) );
 
           return $oldInputs;
         }
         /* put the uploadId at the top level of the stored options */
-        $uploadId = $inputs['monitor_actions']['uploadId'];
+        $uploadId = $this->sanitize_upload_id( $inputs['monitor_actions']['uploadId'] );
         unset ( $inputs['monitor_actions'] );
         $inputs ['uploadId'] = $uploadId;
 
@@ -1100,10 +1122,7 @@ class ImfsPage extends Imfs_AdminPageFramework {
 
   /** @noinspection PhpUnusedParameterInspection */
 
-  private
-  function action(
-    $button, $inputs, $oldInputs, $factory, $submitInfo
-  ) {
+  private function action( $button, $inputs, $oldInputs, $factory, $submitInfo ) {
 
     $monitor = $this->getMonitorName();
     if ( $monitor !== false && $button === 'upload_' . $monitor . '_now' ) {
@@ -1137,13 +1156,13 @@ class ImfsPage extends Imfs_AdminPageFramework {
           $this->setSettingNotice( $msg, 'updated' );
           break;
         case 'upload_metadata_now':
-          $id = imfs_upload_stats( $this->db, $inputs['uploadId'] );
+          $id = imfs_upload_stats( $this->db, $this->sanitize_upload_id( $inputs['uploadId'] ) );
           $this->setSettingNotice( __( 'Metadata uploaded to id ', 'index-wp-mysql-for-speed' ) . $id, 'updated' );
           break;
         case 'upload_monitor_now':
           $mon  = new renderMonitor( $monitor, $this->db );
           $data = $mon->load()->makeUpload();
-          $id   = imfs_upload_monitor( $this->db, $inputs['uploadId'], $monitor, $data );
+          $id   = imfs_upload_monitor( $this->db, $this->sanitize_upload_id( $inputs['uploadId'] ), $monitor, $data );
           /* translators: 1: name of captured monitor.  2: upload id */
           $msg = __( 'Monitor %1$s uploaded to id %2$s', 'index-wp-mysql-for-speed' );
           $msg = sprintf( $msg, $monitor, $id );
@@ -1160,10 +1179,7 @@ class ImfsPage extends Imfs_AdminPageFramework {
     }
   }
 
-  private
-  function listFromCheckboxes(
-    $cbs
-  ) {
+  private function listFromCheckboxes( $cbs ) {
     $result = [];
     foreach ( $cbs as $name => $val ) {
       if ( $val ) {
@@ -1286,10 +1302,10 @@ class ImfsPage extends Imfs_AdminPageFramework {
    */
   function validation_imfs_settings_about( $inputs, $oldInputs, $factory, $submitInfo ) {
     $errors = [];
-    if ( isset( $inputs['uploadId'] ) && strlen( $inputs['uploadId'] ) > 0 ) {
+    if ( isset( $inputs['uploadId'] ) && $this->upload_id_is_sanitized( $inputs['uploadId'] )  ) {
       $valid = true;
     } else {
-      $errors['uploadId'] = __( "Please provide an upload id.", 'index-wp-mysql-for-speed' );
+      $errors['uploadId'] = __( "Please provide a valid upload id. Letters and numbers only.", 'index-wp-mysql-for-speed' );
       $valid              = false;
     }
     if ( ! $valid ) {
@@ -1300,6 +1316,18 @@ class ImfsPage extends Imfs_AdminPageFramework {
     }
 
     return $this->action( $submitInfo['field_id'], $inputs, $oldInputs, $factory, $submitInfo );
+  }
+
+  private function sanitize_upload_id( $uploadId ) {
+    $uploadId = preg_replace('/[^-_a-zA-Z0-9]/', '', $uploadId);
+    return $uploadId;
+  }
+
+  private function upload_id_is_sanitized( $uploadId ) {
+    if ( strlen( $uploadId <= 0 )) {
+      return false;
+    }
+    return $uploadId === $this->sanitize_upload_id( $uploadId );
   }
 
 }

@@ -1,5 +1,7 @@
 <?php /** @noinspection PhpRedundantOptionalArgumentInspection */
 
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 /**
  * Draws the contents of a captured monitor
  */
@@ -238,7 +240,7 @@ END;
    * @return string
    */
   private function getServerUptime( &$status ) {
-    $result = __( 'Database server' ) . ' ' . DB_HOST . '&ensp;';
+    $result = __( 'Database server', 'index-wp-mysql-for-speed'  ) . ' ' . DB_HOST . '&ensp;';
     if ( ( isset( $status->Uptime_state ) ? $status->Uptime_state : 0 ) > 0 ) {
       $uptime = $status->Uptime_state * 1000000;
       $uptime = $this->timeCell( $uptime );

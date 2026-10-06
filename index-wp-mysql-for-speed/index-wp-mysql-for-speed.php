@@ -11,9 +11,9 @@
  * Plugin Name: Index WP MySQL For Speed
  * Plugin URI:  https://plumislandmedia.org/index-wp-mysql-for-speed/
  * Description: Speed up your WordPress site by adding high-performance keys (database indexes) to your MySQL database tables.
- * Version:           1.5.7
+ * Version:           1.6.0
  * Requires at least: 4.2
- * Tested up to:      7.0
+ * Tested up to:      7.1
  * Requires PHP:      5.6
  * Author:       OllieJones, rjasdfiii
  * Author URI:   https://github.com/OllieJones
@@ -27,9 +27,11 @@
  * Tags:         database, index, key, mysql, wp-cli
  */
 
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 /** current version number  */
-define( 'index_wp_mysql_for_speed_VERSION_NUM', '1.5.7' );
-define( 'index_mysql_for_speed_major_version', 1.5 );
+define( 'index_wp_mysql_for_speed_VERSION_NUM', '1.6.0' );
+define( 'index_mysql_for_speed_major_version', 1.6 );
 define( 'index_mysql_for_speed_inception_major_version', 1.3 );
 define( 'index_mysql_for_speed_inception_wp_version', '5.8.3' );
 define( 'index_mysql_for_speed_inception_wp_db_version', 49752 );
@@ -53,7 +55,7 @@ add_action( 'init', 'index_wp_mysql_for_speed_do_everything' );
 
 function index_wp_mysql_for_speed_do_everything( ) {
 
-//  define( 'INDEX_WP_MYSQL_FOR_SPEED_TEST', true ); /*tested up to 53932 */
+//  define( 'INDEX_WP_MYSQL_FOR_SPEED_TEST', true ); /*tested up to 61833 */
   if ( defined ('INDEX_WP_MYSQL_FOR_SPEED_TEST') && INDEX_WP_MYSQL_FOR_SPEED_TEST) {
     require_once( plugin_dir_path( __FILE__ ) . 'tests/test-update-filter.php' );
   }
@@ -202,7 +204,8 @@ function index_wp_mysql_for_speed_activate_mu_plugin() {
     $src  = trailingslashit( plugin_dir_path( __FILE__ ) ) . 'code/assets/mu/' . $filterName;
     $dest = trailingslashit( WPMU_PLUGIN_DIR ) . $filterName;
 
-    if ( ! file_exists( $dest ) ) {
+    $needs_updating = ( ! defined( 'index_wp_mysql_for_speed_MU_VERSION_NUM' ) ) || index_wp_mysql_for_speed_MU_VERSION_NUM !== index_wp_mysql_for_speed_VERSION_NUM;
+    if ( $needs_updating ) {
       /* Make sure the `mu-plugins` directory exists. It might not in a standard install */
       if ( ! is_dir( WPMU_PLUGIN_DIR ) ) {
         wp_mkdir_p( WPMU_PLUGIN_DIR );

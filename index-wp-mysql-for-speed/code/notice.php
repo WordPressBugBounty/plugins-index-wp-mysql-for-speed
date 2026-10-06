@@ -1,5 +1,7 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 class ImfsNotice {
 
   private $monval;
@@ -29,7 +31,7 @@ class ImfsNotice {
     $text        = "<A HREF=\"{$url}\">Index WP MySql For Speed</A>";
     ?>
       <div class="notice notice-info">
-          <p><?php echo $text ?>: <?php echo $description ?></p>
+          <p><?php echo wp_filter_kses( $text ) ?>: <?php echo wp_filter_kses( $description )?></p>
       </div>
     <?php
   }
@@ -64,6 +66,7 @@ class ImfsNotice {
       }
 
       $notice = '<div class="notice notice-info is-dismissible"><p>' . $notice . '</p></div>';
+      /* These notice stanzas get clobbered by wp_filter_kses() */
       echo $notice;
     }
   }
